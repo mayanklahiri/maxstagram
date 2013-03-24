@@ -7,8 +7,10 @@ generating a sequence of image manipulations from a tastefully chosen
 range. Most of the generated filters will look awful, but usually at least
 a few in any run are eye-popping.
 
-![ScreenShot](http://maxstagram.com/featured/featured-3.jpg)
+![ScreenShot](http://maxstagram.com/featured/featured-17.jpg)
 ![ScreenShot](http://maxstagram.com/featured/featured-2.jpg)
+![ScreenShot](http://maxstagram.com/featured/featured-11.jpg)
+![ScreenShot](http://maxstagram.com/featured/featured-5.jpg)
 
 Maxstagram was written for a Linux system. It will probably work on Windows
 with ImageMagick installed if some hard-coded path conventions are tweaked.
