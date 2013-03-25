@@ -3,9 +3,10 @@ Maxstagram
 
 Maxstagram is a small Python program that uses the open-source ImageMagick
 library to automatically generate photo filters. It does this by randomly
-generating a sequence of image manipulations from a tastefully chosen
-range. Most of the generated filters will look awful, but usually at least
-a few in any run are eye-popping.
+generating a sequence of image manipulations from a chosen range which
+ocassionally results in tasteful results. Most of the generated filters
+will look awful and could cause severe trauma both physically and mentally
+to some individuals, but usually at least a few in any run are eye-popping.
 
 You can try it out at [Maxstagram.com](http://maxstagram.com).
 
