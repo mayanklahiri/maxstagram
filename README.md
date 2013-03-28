@@ -28,3 +28,11 @@ on the command line through them, and output the results to a new
 subdirectory called "output" below the working directory. There will
 be a nice index.html page in that directory that you can open in a
 browser to quickly scan the results.
+
+Laptop Warning
+--------------
+
+ImageMagick tends to max out your CPU with multiple threads. This makes it
+fast, but might also cause your laptop to burn up and/or explode into flames
+when you're generating random filters. It might be more prudent to run it
+on a desktop with an OpenCL-enabled GPU, with a fan running, in the winter.
