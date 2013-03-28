@@ -14,7 +14,7 @@ from random import uniform
 
 NOISE_TYPES = ('Gaussian', 'Laplacian', 'Multiplicative', 'Poisson', 'Impulse')
 COLOR_SPACES = ('XYZ', 'Gray', 'HWB', 'Log', 'YUV', 'HSB', 'Rec709Luma', 'YIQ',
-                'Lab', 'YCC', 'HSL', 'Luv', 'CMYK', 'OHTA', 'YCbCr', 'CMY')
+                'Lab', 'YCC', 'HSL', 'CMYK', 'OHTA', 'YCbCr', 'CMY')
 STATISTICS = ('Maximum', 'Median', 'Mean', 'Mode', 'Gradient', 'Nonpeak')
 COLORS = ('RoyalBlue1', 'darkcyan', 'goldenrod', 'firebrick', 'DarkOrange',
           'Navy', 'DarkGreen', 'DodgerBlue', 'Gold')
