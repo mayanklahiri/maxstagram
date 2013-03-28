@@ -13,9 +13,11 @@ from random import choice
 from random import uniform
 
 NOISE_TYPES = ('Gaussian', 'Laplacian', 'Multiplicative', 'Poisson', 'Impulse')
-COLOR_SPACES = ('XYZ', 'Gray', 'HWB', 'Log', 'YUV', 'Lab', 'YCC', 'HSL')
-STATISTICS = ('Maximum', 'Median', 'Mean', 'Mode')
-COLORS = ('RoyalBlue1', 'darkcyan', 'goldenrod', 'firebrick', 'DarkOrange')
+COLOR_SPACES = ('XYZ', 'Gray', 'HWB', 'Log', 'YUV', 'HSB', 'Rec709Luma', 'YIQ',
+                'Lab', 'YCC', 'HSL', 'Luv', 'CMYK', 'OHTA', 'YCbCr', 'CMY')
+STATISTICS = ('Maximum', 'Median', 'Mean', 'Mode', 'Gradient', 'Nonpeak')
+COLORS = ('RoyalBlue1', 'darkcyan', 'goldenrod', 'firebrick', 'DarkOrange',
+          'Navy', 'DarkGreen', 'DodgerBlue', 'Gold')
 OPERATORS = (
     ('-adaptive-blur', ' ', (1.5, 5.0)),
     ('-adaptive-sharpen', ' ', (1.5, 5.0)),
@@ -25,6 +27,7 @@ OPERATORS = (
     ('-blur', ' ', '0x', (1.0, 5.0)),
     ('-blur', ' ', '0x', (1.0, 5.0), ' -paint ', (1, 5)),
     ('-blur', ' ', '0x3 -negate', ' -edge ', (1, 5), ' -negate'),
+    ('-brightness-contrast', ' ', (-50, 50), 'x', (-50, 50), '%'),
     ('-charcoal', ' ', (1, 10)),
     ('-colorspace', ' ', COLOR_SPACES),
     ('-colorize', ' ', (0, 100)),
@@ -52,15 +55,21 @@ OPERATORS = (
     ('-radial-blur', ' ', (0.0, 180.0)),
     ('-raise', ' ', (0, 5)),
     ('-sepia-tone', ' ', (50.0, 99.9)),
+    ('-sigmoidal-contrast', ' ', (0.5, 10.0), ',', (30,70), '%'),
+    ('+sigmoidal-contrast', ' ', (0.5, 10.0), ',', (30,70), '%'),
     ('-sharpen', ' ', (0, 5)),
     ('-sketch', ' ', (1, 5), 'x', (1, 5)),
     ('-statistic', ' ', STATISTICS, ' ', (0, 5)),
-    ('-vignette', ' ', (0, 10.0), 'x', (0.0, 5.0)),
+    ('-swirl', ' ', (0, 180)), 
+    ('-threshold', ' ', (0, 100), '%'), 
+    ('-vignette', ' 0x', (0, 50)),
 )
 COMPOSE_METHODS = (
     'Blend',
     'Dissolve',
     'Modulate',
+    'Displace',
+    'ChangeMask',
 )
 
 
@@ -81,12 +90,19 @@ def GenOperator():
 def GenBlend():
   """Generates a random ImageMagick blending operator."""
   op = choice(COMPOSE_METHODS)
+  args = ''
   if op == 'Blend' or op == 'Dissolve':
     # Blend and dissolve require a source percent 
     args = str(int(uniform(0, 200)))
   if op == 'Modulate':
     # Modulate requires brightness and saturation percent
     args = str(int(uniform(0, 200))) + 'x' + str(int(uniform(0, 200)))
+  if op == 'Displace':
+    # Displace requires an X-scale and Y-scale expressed as a percentage
+    args = str(int(uniform(0, 100))) + 'x' + str(int(uniform(0, 100))) + '%'
+  if op == 'ChangeMask':
+    # ChangeMask requires a fuzz factor to be set before composite is called
+    op = op + ' -fuzz ' + str(int(uniform(0, 100))) + '%'
 
   return ' '.join((
     '-compose',

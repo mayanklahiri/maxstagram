@@ -16,7 +16,7 @@ def StartHTML(filename):
 <!doctype html>
 <html>
 <head>
-  <title>Random Filter Preview</title>
+  <title>Maxstagram Randomly Generated Filter Preview</title>
   <style type="text/css">
   body { 
     font-family: Verdana, Arial; 
@@ -28,10 +28,30 @@ def StartHTML(filename):
   td {
     border: dashed 1px gray;
   }
+  img {
+    width: 320px;
+    height: 320px;
+  }
   </style>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script language="javascript">
+    $(document).ready(function() {
+      $('img').hover(function(ev) {
+        if (ev.type === 'mouseenter') {
+            newsrc = this.src.replace(/img-\S+?-/, '')
+            $.data(this, 'oldsrc', this.src)
+            this.src = newsrc
+        }
+        if (ev.type === 'mouseleave') {
+            this.src = $.data(this, 'oldsrc')
+        }
+      })
+    })
+  </script>
 </head>
 <body>
-<h1>Filter Preview</h1>
+<h1>Maxstagram Randomly Generated Filter Preview</h1>
+<h2>Don't forget to check out <a href="http://maxstagram.com">Maxstagram.com</a> </h2>
 <table>
   <tr>
     <td>#</td>
@@ -43,7 +63,7 @@ def StartHTML(filename):
 
 def WriteHTML(filter_idx, filterop, blendop, outputs, wall_time):
   global output_filename
-  def tdgen(fn): return '<td><img src="' + fn + '"></td>'
+  def tdgen(fn): return '''<td><a href="{fn}"><img src="{fn}"></a></td>'''.format(**locals())
   outputs = [ os.path.basename(i) for i in outputs ]
   table_row = '\n'.join([tdgen(i) for i in outputs ])
   fh_html_index = open(output_filename, 'a+')

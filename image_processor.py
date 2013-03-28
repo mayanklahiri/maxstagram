@@ -5,7 +5,7 @@
 from runner import Run
 from os import path, unlink
 
-def ProcessImage(filename, output_filebase, filterop, blendop, filter_id, outdim = 640):
+def ProcessImage(filename, output_filebase, filterop, blendop, filter_id, outdim = 640, quality = 80):
   if output_filebase[-1:] != '/':
     output_filebase += '/'
   basename = path.basename(filename)
@@ -38,7 +38,7 @@ def ProcessImage(filename, output_filebase, filterop, blendop, filter_id, outdim
                blendop,
                '-resize ' + str(outdim) + 'x' + str(outdim),
                '-normalize',
-               '-quality 75',
+               '-quality ' + str(quality),
                out_file)):
     return None
 

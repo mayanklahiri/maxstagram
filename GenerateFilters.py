@@ -43,7 +43,7 @@ def main(argv):
   # Use lossless PNG as the intermediate file format
   originals = []
   for infile in argv:
-    outfile = 'output/orig-' + os.path.basename(infile).replace(' ', '_') + '.png'
+    outfile = 'output/orig-' + os.path.basename(infile).replace(' ', '_') + '.jpg'
     if 0 != Run(('convert',
                  '"' + infile + '"',
                  '-auto-level',
@@ -51,6 +51,7 @@ def main(argv):
                  '-thumbnail 640x640^',
                  '-gravity center',
                  '-extent 640x640',
+                 '-quality 98',
                  outfile)):
       print 'Cannot resize', infile, 'to save to', outfile
       exit(1)
@@ -66,12 +67,16 @@ def main(argv):
     filterop = [ ''.join(map(str, GenOperator())) for i in range(0, num_operators) ]
     filterop = ' '.join(filterop)
     blendop = GenBlend()
-    print 'FILTER:', filterop
-    print 'BLEND: ', blendop
+    print '''
+=================================================================
+FILTER: {filterop}
+BLEND:  {blendop}
+=================================================================
+'''.format(**locals())
     
     # Process each input file with the filter
     ResetTimer()
-    def runner(fn): return ProcessImage(fn, 'output/', filterop, blendop, filter_idx, 320)
+    def runner(fn): return ProcessImage(fn, 'output/', filterop, blendop, filter_idx, 640)
     outputs = [ runner(i) for i in originals ]
     if None in outputs:
       print "ERROR: please inspect /tmp/IM.out and /tmp/IM.err"
