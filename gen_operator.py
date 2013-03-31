@@ -73,19 +73,21 @@ COMPOSE_METHODS = (
 )
 
 
-def GenOperator():
-  """Generates a random ImageMagick filtering operator."""
-  op = choice(OPERATORS)
-  def _MakeChoice(param):
-    if isinstance(param, tuple):
-      if isinstance(param[0], str):
-        param = choice(param)
-      elif isinstance(param[0], float):
-        param = round(uniform(param[0], param[1]), 2)
-      elif isinstance(param[0], int):
-        param = int(uniform(param[0], param[1]))
-    return param
-  return map(_MakeChoice, op)
+def GenOperator(num = 1):
+  """Generates a set of random ImageMagick filtering operators."""
+  def _Gen(junk):
+    op = choice(OPERATORS)
+    def _MakeChoice(param):
+      if isinstance(param, tuple):
+        if isinstance(param[0], str):
+          param = choice(param)
+        elif isinstance(param[0], float):
+          param = round(uniform(param[0], param[1]), 2)
+        elif isinstance(param[0], int):
+          param = int(uniform(param[0], param[1]))
+      return param
+    return ''.join([ str(_MakeChoice(i)) for i in op ])
+  return ' '.join(map(_Gen, range(0, num)))
 
 def GenBlend():
   """Generates a random ImageMagick blending operator."""
@@ -99,7 +101,7 @@ def GenBlend():
     args = str(int(uniform(0, 200))) + 'x' + str(int(uniform(0, 200)))
   if op == 'Displace':
     # Displace requires an X-scale and Y-scale expressed as a percentage
-    args = str(int(uniform(0, 100))) + 'x' + str(int(uniform(0, 100))) + '%'
+    args = str(int(uniform(0, 30))) + 'x' + str(int(uniform(0, 30))) + '%'
   if op == 'ChangeMask':
     # ChangeMask requires a fuzz factor to be set before composite is called
     op = op + ' -fuzz ' + str(int(uniform(0, 100))) + '%'
@@ -112,6 +114,17 @@ def GenBlend():
     '-auto-level',    
   ))
 
+def GenLayeredOperator(layers = 1):
+  """Generates a random ImageMagick operator with one or more layers."""
+  def _GenLayer(junk):
+    num = int(uniform(1, 5))
+    return ' '.join((
+      '\( +clone',
+      GenOperator(num),
+      '\)',
+      GenBlend()
+    ))
+  return ' '.join(map(_GenLayer, range(0, layers)))
 
 if __name__ == '__main__':
   print ''.join(map(str, GenOperator()))

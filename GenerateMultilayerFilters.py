@@ -4,6 +4,9 @@
 # Released under the BSD License
 """Generates a series of random photo filters and processes 
    a set of photos with them, generating nice output in output/index.html.
+   This is the *multi-layer* variant of GenerateFilters.py -- it is much
+   more prone to generating absolute garbage since the space of filters
+   is much larger. Use this script at your own risk; your eyes may bleed.
 """
 from random import uniform
 from sys import argv
@@ -63,8 +66,8 @@ def main(argv):
   for filter_idx in range(0, 400):
     # Increasing the number of operators allows for more complex filters at
     # the cost of increased computational requirements.
-    num_operators = int(uniform(1, 20))
-    filterop = GenOperator(num_operators)
+    num_layers = int(uniform(1, 3))
+    filterop = GenLayeredOperator(num_layers)
     blendop = GenBlend()
     print '''
 =================================================================
