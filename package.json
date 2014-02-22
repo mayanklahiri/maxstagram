@@ -1,0 +1,40 @@
+{
+  "name": "maxstagram",
+  "version": "2.0.0",
+  "description": "A flexible, continuous image processing web service.",
+  "keywords": [
+    "maxstagram",
+    "image processing",
+    "photo filters",
+    "random art"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mayanklahiri/maxstagram.git"
+  },
+  "author": {
+    "name": "Mayank Lahiri",
+    "email": "mlahiri@gmail.com",
+    "url": "http://lahiri.me/"
+  },
+  "dependencies": {
+    "winston": "^0.7.2",
+    "minimist": "0.0.8",
+    "formidable": "^1.0.14",
+    "express": "^3.4.8",
+    "mongoose": "^3.8.7"
+  },
+  "devDependencies": {
+    "docco": ">= 0.4.4 < 1"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://raw.github.com/senchalabs/connect/master/LICENSE"
+    }
+  ],
+  "main": "main",
+  "engines": {
+    "node": ">= 0.8.0"
+  }
+}
