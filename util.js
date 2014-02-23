@@ -81,9 +81,27 @@ util.launch.supervise = function(module_path, config) {
   _restart('starting');
 }
 
-util.launch.cron = function(module_path, options) {
-  util.ensure(options, ['frequencySeconds', 'runForMaxSeconds']);
+util.launch.cron = function(module_path, config, options) {
+  util.ensure(options, ['pauseBetweenRunsSeconds']);
+  var _G = {
+    child: null,
+    running: false,
+    launched: null,
+    env: {
+      config: JSON.stringify(config),
+    },
+  };       
+  
+  function launch() {   
+    _G.child = fork(module_path, [], {env: _G.env});
+    _G.launched = new Date().getTime(); 
+    _G.child.on('exit',  function() { 
+      setTimeout(launch, options.pauseBetweenRunsSeconds * 1000);
+    });
+  }
+  
+  launch();                       
   log.info(util.format('Cronning %s at %d seconds', 
                        module_path, 
-                       options.frequencySeconds));
+                       options.pauseBetweenRunsSeconds));
 }

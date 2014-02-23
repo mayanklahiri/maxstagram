@@ -21,9 +21,8 @@ function main() {
   
   // Load process modules
   launch.supervise('processes/WebServer', config);
-  launch.cron('UploadIngester', {
-    frequencySeconds: 5, 
-    runForMaxSeconds: 240
+  launch.cron('processes/UploadIngester', config, {
+    pauseBetweenRunsSeconds: 5, 
   });
 }
 

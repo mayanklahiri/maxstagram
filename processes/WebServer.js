@@ -75,7 +75,7 @@ function ProcessFileUpload(email, remote_ip, upload_metadata) {
   metadata.remote_ip = remote_ip;
   metadata.received = new Date();  
   
-  db.QueueForProcessing('uploads', metadata, function(err) {
+  db.QueueForProcessing('uploads', metadata, function(err, metadata) {
     if (err) {
       log.error('WebServer: QueueForProcessing failed:', err);
       return;

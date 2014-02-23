@@ -5,4 +5,6 @@ module.exports = {
   dir_derived: 'frontend/derived',
   
   mongodb_server: 'mongodb://localhost/maxstagram',
+  
+  img_dims: [240, 720, 2048],
 };

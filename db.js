@@ -4,28 +4,67 @@ var mongoose = require('mongoose')
   ;
 
 
+var SCHEMA = {
+  uploads: {
+    hash: {type: String, index: true, unique: true},
+    size: {type: Number},
+    name: {type: String},
+    type: {type: String},
+    path: {type: String},
+    email: {type: String},
+    received: {type: Date},
+    remote_ip: {type: String},
+    _reprocess_after: {type: Number, index: true},
+  },
+};
+var MODELS = {};
+    
+    
 exports.init = function(config, cb) {
   if (!config.mongodb_server)
     return cb('Configuration does not specify "mongodb_server" parameter.');
-  
+
   mongoose.connect(config.mongodb_server, {
     server: { poolSize: 3 },
   });
   mongoose.connection.on('error', cb);
   mongoose.connection.once('open', function() {
-    log.info('DB: connected to MongoDB');
     _setupSchema(cb);
   });
 }
 
+// Convert schema to models
 function _setupSchema(cb) {
-  // TODO: create and setup schema  
+  for (var table in SCHEMA) {
+    var schema = new mongoose.Schema(SCHEMA[table]); 
+    MODELS[table] = mongoose.model(table, schema);
+  }
   return cb();
 }
 
 exports.QueueForProcessing = function(table, object, cb) {
   if (!table || !object)
     return cb('No table or object specified.');
-  object.reprocess_after = new Date().getTime();  
-  // TODO: save object to collection
+  object._reprocess_after = new Date().getTime();
+  var obj = new MODELS[table](object);
+  obj.save(function(err, doc) {
+    cb(err, doc?doc.toObject():null);
+  });
+}
+
+exports.PullForProcessing = function(table, lock_duration, cb) {
+  var Model = MODELS[table];
+  var query = {
+    _reprocess_after: { '$lt': new Date().getTime() },
+  };
+  var update = {
+    '$inc': { '_reprocess_after': lock_duration },
+  };
+  var options = {
+    'new': true,
+    'upsert': false,
+  };
+  Model.findOneAndUpdate(query, update, options, function (err, modified) {
+    cb(err, modified);
+  }); 
 }
