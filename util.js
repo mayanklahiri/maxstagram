@@ -43,13 +43,30 @@ util.ensure = function(obj, fields) {
           fields[i],
           util.inspect(obj)));
   } else {
-    throw new Error('Null parameters passed'); 
+    throw new Error('Null parameters passed');
   }
 }
 
 util.min = function(a, b) {
   return a < b ? a : b;
 }
+
+util.randint = function(N) {
+  return Math.floor(Math.random() * N);
+}
+
+util.choice = function(array) {
+  if(!array) return;
+  if(!array.length) return;
+  return array[util.randint(array.length)];
+}
+
+util.extend = function(base, extension) {
+  if (!base || !extension) return;
+  for (var i = 0; i < extension.length; i++)
+    base.push(extension[i]);
+}
+
 
 util.launch = {};
 util.launch.supervise = function(module_path, config) {
@@ -70,9 +87,9 @@ util.launch.supervise = function(module_path, config) {
     setTimeout(function() {
       _G.child = fork(module_path, [], {env: _G.env});
       _G.child.on('error', _restart.bind('error'));
-      _G.child.on('exit', _restart.bind('exit'));      
-      log.info(util.format('supervise: started %s, pid=%d backoff=%dms last_restart_delta=%dms', 
-                           module_path, 
+      _G.child.on('exit', _restart.bind('exit'));
+      log.info(util.format('supervise: started %s, pid=%d backoff=%dms last_restart_delta=%dms',
+                           module_path,
                            _G.child.pid,
                            _G.backoff,
                            time_since_restart));
@@ -90,18 +107,18 @@ util.launch.cron = function(module_path, config, options) {
     env: {
       config: JSON.stringify(config),
     },
-  };       
-  
-  function launch() {   
+  };
+
+  function _launch() {
     _G.child = fork(module_path, [], {env: _G.env});
-    _G.launched = new Date().getTime(); 
-    _G.child.on('exit',  function() { 
-      setTimeout(launch, options.pauseBetweenRunsSeconds * 1000);
+    _G.launched = new Date().getTime();
+    _G.child.on('exit',  function() {
+      setTimeout(_launch, options.pauseBetweenRunsSeconds * 1000);
     });
   }
-  
-  launch();                       
-  log.info(util.format('Cronning %s at %d seconds', 
-                       module_path, 
+
+  _launch();
+  log.info(util.format('Cronning %s at %d seconds',
+                       module_path,
                        options.pauseBetweenRunsSeconds));
 }
