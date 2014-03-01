@@ -1,6 +1,8 @@
 var path = require('path')
   , os = require('os')
+  , fs = require('fs')
   , db = require('../db')
+  , jade = require('jade')  
   , express = require('express')
   , formidable = require('formidable')
   , util = require('../util')
@@ -37,7 +39,7 @@ function main() {
 
       var remote_ip = req.connection.remoteAddress;
       ProcessFileUpload(fields.email, remote_ip, files.image);
-      End(res, 200, 'Received upload, thank you.');
+      End(res, 200, 'Your image has been queued for processing.');
     });
   });
 
@@ -47,6 +49,11 @@ function main() {
     log.info('WebServer: webroot directory is %s', config.dir_webroot);
     app.use(express.static(config.dir_webroot, {maxAge: 86400}));
   }
+
+  // Add custom 404
+  app.use(function (req, res, next) {
+    End(res, 404, 'Could not get ' + req.url);
+  });
 
 
   // Init database
@@ -63,9 +70,17 @@ function main() {
   });
 }
 
+function GenResponse(message) {
+  var template = fs.readFileSync('message.jade', 'utf8');
+  return jade.render(template, {
+    pretty: true,
+    message: message
+  });
+}
+
 function End(res, http_code, message) {
-  res.writeHead(http_code, {'content-type': 'text/plain'});
-  res.end(message);
+  res.writeHead(http_code, {'content-type': 'text/html'});
+  res.end(GenResponse(message));
 }
 
 function ProcessFileUpload(email, remote_ip, upload_metadata) {
@@ -80,7 +95,7 @@ function ProcessFileUpload(email, remote_ip, upload_metadata) {
       log.error('WebServer: QueueForProcessing failed:', err);
       return;
     }
-    log.info('WebServer: queued uploaded file:', metadata.path);
+    log.info('WebServer: queued uploaded file:', path.basename(metadata.path));
   });
 }
 

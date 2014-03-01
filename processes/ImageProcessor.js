@@ -9,10 +9,9 @@ var db = require('../db')
   , log = util.log
   ;
 
-var TIMEOUT = 240000;   // 4 minutes
+var TIMEOUT = 1000 * 600; // 600 seconds
 
 function main() {
-  log.info('ImageProcessor: wake up');
   db.init(config, function(err) {
     if (err) process.exit(-1);
     db.PullForProcessing('base', TIMEOUT, function (err, doc) {
@@ -36,11 +35,13 @@ function ProcessImage(base_obj, cb) {
   var out_file_base = util.format('%s-%d',
                                   path.join(config.dir_derived, base_obj.hash),
                                   util.randint(100000));
-  var out_file = out_file_base + '-largest.jpg';
+  var out_file = out_file_base;
 
-  log.info(util.format('ProcessImage: pulled in=%s out=%s',
+  log.info(util.format('ProcessImage: pulled in=%s out=%s email=%s num_to_derive=%d',
                        path.basename(in_file),
-                       path.basename(out_file_base)));
+                       path.basename(out_file_base),
+                       base_obj.email,
+                       base_obj.num_to_derive));
   var derived = {};
 
 
@@ -57,7 +58,6 @@ function ProcessImage(base_obj, cb) {
         derived.params = {
           fx: fx_params,
         };
-        log.info('ImageProcessor: gen-fx:', fx_params.join(' '));
       }
       next(err);
     });
@@ -72,13 +72,39 @@ function ProcessImage(base_obj, cb) {
       else {
         blend_params.splice(0, 2);
         blend_params.splice(blend_params.length-1, 1);
-        derived.params = {
-          blend: blend_params,
-        };
-        log.info('ImageProcessor: gen-blend:', blend_params.join(' '));
+        derived.params.blend = blend_params;
       }
       next(err);
     });
+  });
+  
+  // Execution sequence: generate resized versions
+  for (var dim_label in config.img_dims)
+    exec_seq.push((function(dim_label, max_dim) {
+      return function(next) {
+        im.convert([
+          out_file,
+          '-strip',
+          '-quality',
+          '75',
+          '-resize',
+          util.format('%dx%d>', max_dim, max_dim),
+          out_file_base + util.format('-%s.jpg', dim_label),
+        ], function (err, stdout) {
+          if (err) log.info('ImageProcessor: err=' + err, stdout);
+          next(err);
+        });
+
+      };
+    })(dim_label, config.img_dims[dim_label]));
+
+  // Execution sequence: generate entry in 'derived' table
+  exec_seq.push(function(next) {
+  	derived.base_hash = base_obj.hash;
+  	derived.path = out_file;
+  	derived.params = JSON.stringify(derived.params);
+  	derived.generated = new Date().getTime();
+  	db.Push('derived', derived, next);
   });
 
   // Execution sequence: update derived count
@@ -87,10 +113,24 @@ function ProcessImage(base_obj, cb) {
     if (base_obj.num_to_derive <= 0) {
       base_obj['_reprocess_after'] = null;
       base_obj.num_to_derive = 0;
+      
+      // Queue notification to sender
+      var notification = {
+      	email: base_obj.email,
+      	base_hash: base_obj.hash,
+      	type: 'new_images_available',
+      };      
+      db.QueueForProcessing('notifications', notification);   
     } else
       base_obj['_reprocess_after'] = new Date().getTime();
     base_obj.save(next);
   });
+  
+  // Execution sequence: print a logline
+  exec_seq.push(function(next) {
+  	log.info('ProcessImage: finished', path.basename(in_file));
+  	next();
+  })
 
   async.series(exec_seq, cb);
 }

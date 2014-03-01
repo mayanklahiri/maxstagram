@@ -10,7 +10,6 @@ var db = require('../db')
 var TIMEOUT = 20000;
 
 function main() {
-  log.info('UploadIngester: wake up');
   db.init(config, function(err) {
     if (err) process.exit(-1);
     db.PullForProcessing('uploads', TIMEOUT, function (err, doc) {

@@ -1,0 +1,16 @@
+doctype html
+html(lang="en")
+  body(style="background-color: #333; color: #999; padding: 10px;")
+    h1(style='font-family: sans-serif; margin: 0 0 30px 0; font-size: 24px; font-weight: 400; color: #c44; margin: 0 0 10px 0;')
+      span(style='font-weight: bold; font-family: "Passion One", sans-serif')
+      | MAXSTAGRAM: New Images Available
+    each doc in docs
+      div(style='display: inline-block; background-color: #222; float: left; padding: 10px 8px 10px 8px; border-radius: 3px; margin: 0 10px 10px 0; color: #999; font-size: 11px; font-family: sans-serif; min-width: 240px;')
+        div
+          a(href=doc.link, target='_blank', style='color: white; text-decoration: none')
+            img(src=doc.path)
+        div= doc.generated
+    div(style='float: none; clear: both') &nbsp;
+    a(href='http://disney.com', target='_blank', style='text-decoration: none')
+      div(style='font-family: sans-serif; background-color: #c44; color: white; font-weight: bold; margin: 0 0 20px 0; padding: 15px 20px 15px 20px; text-align: center; border-radius: 4px; width: 240px; box-shadow: 3px 3px 3px grey;') 
+        span KEEP GENERATING FILTERS

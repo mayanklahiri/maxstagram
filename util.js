@@ -99,7 +99,8 @@ util.launch.supervise = function(module_path, config) {
 }
 
 util.launch.cron = function(module_path, config, options) {
-  util.ensure(options, ['pauseBetweenRunsSeconds']);
+  options = options || {};
+  options.pauseBetweenRunsSeconds = options.pauseBetweenRunsSeconds || 3;
   var _G = {
     child: null,
     running: false,

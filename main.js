@@ -21,12 +21,9 @@ function main() {
 
   // Load process modules
   launch.supervise('processes/WebServer', config);
-  launch.cron('processes/UploadIngester', config, {
-    pauseBetweenRunsSeconds: 5,
-  });
-  launch.cron('processes/ImageProcessor', config, {
-    pauseBetweenRunsSeconds: 5,
-  });
+  launch.cron('processes/UploadIngester', config);
+  launch.cron('processes/ImageProcessor', config);
+  launch.cron('processes/NotificationSender', config);
 }
 
 
