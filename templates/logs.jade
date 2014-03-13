@@ -1,0 +1,23 @@
+doctype html
+html(lang="en")
+  head
+    link(rel='stylesheet/less', type='text/css', href='logs.less')
+    script(src='less-1.7.0.min.js')
+  body
+    div.container
+      h1
+        a(href='/') Maxstagram Logs
+      table
+        thead
+          tr
+            td Timestamp
+            td Level
+            td Message
+            td Metadata
+        tbody
+          each log in logs.reverse()
+            tr
+              td= log.timestamp
+              td= log.level
+              td= log.message
+              td(style='white-space: pre; color: gray; font-family: monospace')= JSON.stringify(log, null, 2)
