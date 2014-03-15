@@ -1,38 +1,39 @@
-Maxstagram
-==========
+## Maxstagram uses randomness to generate image filters.
 
-Maxstagram is a small Python program that uses the open-source ImageMagick
-library to automatically generate photo filters. It does this by randomly
-generating a sequence of image manipulations from a chosen range which
-ocassionally results in tasteful results. Most of the generated filters
-will look awful and could cause severe trauma both physically and mentally
-to some individuals, but usually at least a few in any run are eye-popping.
+Throughtout its humble career, Maxstagram has garnered almost five dozen unique views.
+Most of these were people looking directly at Maxstagram-filtered images, with 80% of
+them having tried to upload an image themselves. That's 8 out of 10 people. It has been
+used to generate several thousand filtered images, making it one of the largest and least
+consequential collections of modern art.
 
-You can try it out at [Maxstagram.com](http://maxstagram.com).
+Maxstagram works using a simple principle: if you put something good into, you might
+get something good out of it, eventually. Making an algorithm render garbage is a very
+difficult task. There is no obvious way to turn digital coin flips into an aesthetically
+pleasing distortion of color and texture, so we rely on the human eye to pick out aesthetic
+from randomness. The best we can do is say that every image generated is almost certainly
+unique, and generate a lot of them for you to look at reasonably quickly, so that you can
+pick out the ones that best appeal to you.
 
-![ScreenShot](http://maxstagram.com/featured/featured-17.jpg)
-![ScreenShot](http://maxstagram.com/featured/featured-2.jpg)
-![ScreenShot](http://maxstagram.com/featured/featured-11.jpg)
-![ScreenShot](http://maxstagram.com/featured/featured-5.jpg)
+Its inner workings resemble highly trained chaos monkeys working Photoshop, after a human
+has taken a nice photograph and loaded it into the program. These monkey may adjust the color
+and brightness, apply distortion filters, and flip around the colorspace randomly. Got
+a lovely picture of your puppy? It may end up looking like a disembodied eyeball surrounded
+in rainbow hues. As for that nice selfie? Your friends will certainly appreciate the uniqueness
+of a sepia-toned X-ray filter on it. These are just some of the many, occassionally pleasant,
+surprises produced by our Brownian simians.
 
-Maxstagram was written for a Linux system. It will probably work on Windows
-with ImageMagick installed if some hard-coded path conventions are tweaked.
+Maxstagram works conveniently at fine art resolutions, for the modest price of free. The
+image files generated can be printed onto large canvases, or as small tattoos.
 
-Usage
------
+The free web service is at http://maxstagram.com
 
-    ./GenerateFilters.py photo1.jpg photo900.jpg another-photo.jpg
+## Installation
 
-This will generate 100 random filters, run all the photos you specified
-on the command line through them, and output the results to a new
-subdirectory called "output" below the working directory. There will
-be a nice index.html page in that directory that you can open in a
-browser to quickly scan the results.
+Linux:
 
-Laptop Warning
---------------
-
-ImageMagick tends to max out your CPU with multiple threads. This makes it
-fast, but might also cause your laptop to burn up and/or explode into flames
-when you're generating random filters. It might be more prudent to run it
-on a desktop with an OpenCL-enabled GPU, with a fan running, in the winter.
+1. Clone this repository.
+2. Run `npm install` in the repo root to install package dependencies.
+3. Sign up for a free Mailgun account at http://mailgun.com and paste the API key into a file in the repo root called MAILGUN_KEY. This file is ignored by .gitignore.
+4. Install MongoDB.
+5. Take a look at `config.js` and make changes if you need to.
+6. Run `npm run dev` to start the server in development mode, or `npm run prod` for production.

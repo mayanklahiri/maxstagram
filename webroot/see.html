@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="stylesheet/less" type="text/css" href="see.less" />
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.14/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.14/angular-resource.min.js"></script>
+  <script src="less-1.7.0.min.js"></script>
+  <script src="see.js"></script>
+  <script src="ga.js"></script>
+</head>
+<body ng-app="SeeApp">
+<div ng-controller="SeeCtrl">
+  <h1><a href="/index.html" target="_self">Maxstagram</a></h1>
+  <div class="block">
+    <img ng-hide="show_original" ng-src="/derived/{{base_hash}}-{{gen_id}}-medium.jpg">
+    <img ng-show="show_original" ng-src="/base/{{base_hash}}-medium.jpg">
+  </div>
+  <div class="block">
+    <div class="infobox">
+      <h3>{{data.name}}</h3>
+      <div class="section">
+        <a ng-show="show_original" ng-click="show_original=!show_original">See filtered image</a>
+        <a ng-hide="show_original" ng-click="show_original=!show_original">See original image</a>
+      </div>
+      <div class="section">
+        Download:
+        <ul>
+          <li><a href="/derived/{{base_hash}}-{{gen_id}}-largest.jpg" target="_blank">Largest</a> (printing)</li>
+          <li><a href="/derived/{{base_hash}}-{{gen_id}}-large.jpg" target="_blank">Large</a> (email)</li>
+          <li><a href="/derived/{{base_hash}}-{{gen_id}}-medium.jpg" target="_blank">Medium</a> (sharing)</li>
+          <li><a href="/derived/{{base_hash}}-{{gen_id}}-square.jpg" target="_blank">Thumbnail</a></li>
+        </ul>
+      </div>
+      <div class="section">
+        Generation time:
+        <pre class="params">{{data.walltime_sec}} seconds<br>{{data.generated | date:['medium']}}</pre>
+      </div>
+      <div class="section">
+        Operations:
+        <pre class="params">{{data.fx_params | formatParams}}</pre>
+        Blend:
+        <pre class="params">{{data.blend_params | formatParams}}</pre>
+      </div>
+    </div>
+  </div>
+  <div class="clearfix"></div>
+  <div class="history" ng-show="history.length">
+    <h3>
+      <a ng-click="zap_history()">&#x2716;</a>
+      Previously viewed on this computer
+    </h3>
+    <div class="item" ng-repeat="item in history">
+      <a target="_self" href="/see.html?img={{item.base_hash}}-{{item.gen_id}}-largest.jpg">
+        <img ng-src="/derived/{{item.base_hash}}-{{item.gen_id}}-square.jpg">
+      </a>
+      <br>
+      {{item.name}}
+    </div>
+  </div>
+</div>
+</body>
+</html>

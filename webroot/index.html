@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+  	<link rel="stylesheet/less" type="text/css" href="style.less" />
+	  <script src="less-1.7.0.min.js"></script>
+    <script src="ga.js"></script>
+  </head>
+  <body>
+  <div class="container">
+  	<h1><a href="/">Maxstagram</a></h1>
+
+    <h2>Maxstagram uses randomness to generate image filters.</h2>
+
+    <form method="post"
+          enctype="multipart/form-data"
+          action="/upload">
+
+      <div class="label clearfix">
+        <div class="block">
+          <label for="image">Choose a photo</label>
+          <br>
+          <input id="image"
+                 name="image"
+                 type="file">
+        </div>
+        <div class="block">
+          <label for="name">Give it a name</label>
+          <br>
+          <input type='text' id="name" name="name">
+        </div>
+      </div>
+
+      <div class="label">
+        <label for="email">Enter your email address</label>
+        <br>
+        <input type='text' id="email" name="email">
+      </div>
+
+      <p class="fine">
+         Filtered images are generated in large batches and
+         the links to download them are emailed to you.
+         Most of the results will be awful, but
+         you do find the occassional gem.
+      </p>
+
+      <input type="submit" value="UPLOAD FOR PROCESSING">
+   </form>
+
+   <p class="fine" style="margin-top: 20px">
+     The source code for this entire site is available at
+     <a href="http://github.com/mayanklahiri/maxstagram">Github</a>.
+   </p>
+
+   </div>
+</body>
+</html>
