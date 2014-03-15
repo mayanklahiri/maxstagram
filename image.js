@@ -5,20 +5,25 @@ var im = require('imagemagick')
   ;
 
 exports.Process = function(in_file, out_file, fx_params, cb) {
+  fx_params = fx_params.slice();
   fx_params.splice(0, 0, in_file);
+  fx_params.push('-limit');
+  fx_params.push('thread');
+  fx_params.push('1');
   fx_params.push(out_file);
   var start_time = new Date();
   im.convert(fx_params, function (err, stdout) {
     if (err)
-      util.log.error('Process: ' + stdout, {
+      util.log.error('ImageMagick convert: error', {
         in_file: in_file,
         out_file: out_file,
         params: fx_params,
         err: err,
+        stdout: stdout,
         walltime_sec: (new Date() - start_time) / 1000,
       });
     else
-      util.log.info('Process: finished', {
+      util.log.info('ImageMagick convert: finished', {
         in_file: in_file,
         out_file: out_file,
         params: fx_params,
@@ -46,7 +51,6 @@ exports.MultiResize = function(in_file, out_file_base, sizes, quality, cb) {
         output_files.push(out_file);
         var params = [
           in_file,
-          '-auto-level',
           '-auto-orient',
         ];
         if (dim_label == 'square')
@@ -61,7 +65,6 @@ exports.MultiResize = function(in_file, out_file_base, sizes, quality, cb) {
           ]);
         params.push.apply(params, [
           '-quality', quality,
-          '-density', '200',
           '-strip',
           out_file,
         ]);
@@ -85,7 +88,6 @@ exports.MultiResize = function(in_file, out_file_base, sizes, quality, cb) {
   return async.series(exec_sequence, _terminal);
 }
 
-
 exports.GenerateEffectsLayer = function(num_operators) {
   var cmd = [];
   for (var i = num_operators; --i>=0; ) {
@@ -96,6 +98,7 @@ exports.GenerateEffectsLayer = function(num_operators) {
       if (typeof op[j] == 'object' && op[j].length) {
         if (typeof op[j][0] == 'number' && op[j].length == 2) {
           op[j] = Math.random() * (op[j][1] - op[j][0]) + op[j][0];
+          op[j] = Math.floor(op[j]*100)/100;
           continue;
         }
         if (typeof op[j][0] == 'string') {
@@ -109,16 +112,16 @@ exports.GenerateEffectsLayer = function(num_operators) {
   return cmd;
 }
 
-exports.GenerateBlendLayer = function(fx_file) {
+exports.GenerateBlendLayer = function() {
   var op = util.choice(COMPOSE_METHODS);
-  var cmd = [fx_file];
+  var cmd = [];
   var args = '';
   if (op == 'Blend' || op == 'Dissolve')
     // Blend and dissolve require a source percent
-    args = util.randint(200);
+    args = util.format('%dx%d', util.randint(200), util.randint(100));
   if (op == 'Modulate')
     // Modulate requires brightness and saturation percent
-    args = util.format('%dx%d', util.randint(200), util.randint(200));
+    args = util.format('%dx%d', util.randint(100), util.randint(100));
   if (op == 'Displace')
     // Displace requires an X-scale and Y-scale expressed as a percentage
     args = util.format('%dx%d%%',
@@ -133,19 +136,91 @@ exports.GenerateBlendLayer = function(fx_file) {
   util.extend(cmd, [
     '-compose',
     op,
-    '-define',
-    'compose:args=' + args,
+    '-define', 'compose:args=' + args,
     '-composite',
-    '-normalize',
   ]);
 
   return cmd;
 }
 
-var NOISE_TYPES = ['Gaussian', 'Laplacian', 'Multiplicative', 'Poisson', 'Impulse'];
-var COLOR_SPACES = ['XYZ', 'Gray', 'HWB', 'Log', 'YUV', 'HSB', 'Rec709Luma', 'YIQ',
-                    'Lab', 'YCC', 'HSL', 'CMYK', 'OHTA', 'YCbCr', 'CMY'];
-var STATISTICS = ['Maximum', 'Median', 'Mean', 'Mode', 'Gradient', 'Nonpeak'];
+// config has optional fields convert_path, identify_path
+exports.Init = function(config, cb) {
+  if (config.convert_path)
+    im.convert.path = config.convert_path;
+  if (config.identify_path)
+    im.identify.path = config.identify_path;
+
+  async.series([
+    _GetNoiseTypes,
+    _GetColorspaces,
+    _GetStatistics,
+    _GetColors,
+  ], cb);
+
+  function _trim(str) {
+    str = str.replace(/^\s*|\s*$/g, '');
+    return str.length ? str : null;
+  }
+
+  function _GetNoiseTypes(next) {
+    im.convert(['-list', 'noise'], function (err, stdout) {
+      if (err) return next(err, stdout);
+      var noise_types = stdout.split('\n');
+      if (noise_types.length) NOISE_TYPES = noise_types.filter(_trim);
+      next();
+    });
+  }
+
+  function _GetColorspaces(next) {
+    im.convert(['-list', 'colorspace'], function (err, stdout) {
+      if (err) return next(err, stdout);
+      var colorspaces = stdout.split('\n');
+      if (colorspaces.length) COLOR_SPACES = colorspaces.filter(_trim);
+      next();
+    });
+  }
+
+  function _GetStatistics(next) {
+    im.convert(['-list', 'statistic'], function (err, stdout) {
+      if (err) return next(err, stdout);
+      var statistics = stdout.split('\n');
+      if (statistics.length) STATISTICS = statistics.filter(_trim);
+      next();
+    });
+  }
+
+  function _GetColors(next) {
+    im.convert(['-list', 'color'], function (err, stdout) {
+      if (err) return next(err, stdout);
+      var colors = stdout.split('\n');
+      var start = false;
+      if (colors.length) {
+        COLORS = [];
+        for (var i = 0; i < colors.length; i++)
+          if (!start) {
+            if (colors[i].match(/^\-+\s*$/))
+              start = true;
+            continue;
+          }
+          else {
+            var col = colors[i].replace(/\s.*/, '');
+            COLORS.push(col);
+          }
+      }
+      if (!COLORS.length) return next('Unable to parse predefined color names');
+      next();
+    });
+  }
+}
+
+// Tailored to ImageMagick 6.8.8-8
+var NOISE_TYPES = ['Gaussian', 'Impulse', 'Poisson', 'Random', 'Uniform'];
+var COLOR_SPACES = ['CIELab', 'CMY', 'CMYK', 'Gray', 'HCL', 'HCLp', 'HSB', 'HSI', 'HSL',
+                    'HSV', 'HWB', 'Lab', 'LCH', 'LCHab', 'LCHuv', 'LMS', 'Log', 'Luv',
+                    'OHTA', 'Rec601Luma', 'Rec601YCbCr', 'Rec709Luma', 'Rec709YCbCr',
+                    'RGB', 'scRGB', 'sRGB', 'Transparent', 'XYZ', 'YCbCr', 'YDbDr',
+                    'YCC', 'YIQ', 'YPbPr', 'YUV'];
+var STATISTICS = ['Maximum', 'Median', 'Mean', 'Minimum', 'Mode', 'Gradient', 'Nonpeak'];
 var COLORS = ['RoyalBlue1', 'darkcyan', 'goldenrod', 'firebrick', 'DarkOrange',
               'Navy', 'DarkGreen', 'DodgerBlue', 'Gold'];
 var OPERATORS = [
@@ -153,12 +228,13 @@ var OPERATORS = [
     ['-adaptive-sharpen', ' ', [1.5, 5.0]],
     ['-auto-gamma',],
     ['-auto-level',],
+    ['-black-threshold', ' ', [1, 100], '%'],
     ['-blue-shift', ' ', [1.5, 5.0]],
     ['-blur', ' ', '0x', [1.0, 5.0]],
     ['-blur', ' ', '0x', [1.0, 5.0], ' -paint ', [1, 5]],
     ['-blur', ' ', '0x3 -negate', ' -edge ', [1, 5], ' -negate'],
     ['-brightness-contrast', ' ', [-50, 50], 'x', [-50, 50], '%'],
-    ['-charcoal', ' ', [1, 10]],
+    ['-charcoal', ' ', [1, 15]],
     ['-colorspace', ' ', COLOR_SPACES],
     ['-colorize', ' ', [0, 100], ',', [0, 100], ',', [0, 100]],
     ['-colorize', ' ', [0, 100]],
@@ -173,13 +249,18 @@ var OPERATORS = [
     ['-enhance',],
     ['-equalize',],
     ['-fill', ' ', COLORS, ' -tint ', [0, 100]],
+    ['-flip'],
     ['-gamma', ' ', [0.8, 2.3]],
     ['-gamma', ' ', [0.8, 2.3], ',', [0.8, 2.3], ',', [0.8, 2.3]],
+    ['-implode', ' ', [1, 8]],
+    ['-lat', ' ', [0, 10]],
+    ['-level', ' ', [0,200], ',', [0,200], ',', [-0.5, 0.5]],
     ['-modulate', ' ', [0, 200], ',', [0, 200], ',', [0, 180]],
     ['-monochrome',],
     ['-negate',],
     ['+noise', ' ', NOISE_TYPES, ' -attenuate ', [0.0, 0.7]],
     ['-normalize',],
+    ['-paint', ' ', [1, 10]],
     ['-posterize', ' ', [1, 4]],
     ['-quantize', ' ', COLOR_SPACES],
     ['-radial-blur', ' ', [0.0, 180.0]],
@@ -187,14 +268,13 @@ var OPERATORS = [
     ['-sepia-tone', ' ', [50.0, 99.9]],
     ['-sigmoidal-contrast', ' ', [0.5, 10.0], ',', [30,70], '%'],
     ['+sigmoidal-contrast', ' ', [0.5, 10.0], ',', [30,70], '%'],
+    ['-shade', ' ', [0,359], 'x', [0,359]],
     ['-sharpen', ' ', [0, 5]],
     ['-sketch', ' ', [1, 5], 'x', [1, 5]],
     ['-statistic', ' ', STATISTICS, ' ', [0, 5]],
-    ['-swirl', ' ', [0, 180]],
+    ['-swirl', ' ', [0, 359]],
     ['-threshold', ' ', [0, 100], '%'],
-    ['-vignette', ' 0x', [0, 50]],
 ];
-
 var COMPOSE_METHODS = [
     'Blend',
     'Dissolve',
@@ -202,9 +282,30 @@ var COMPOSE_METHODS = [
     'Displace',
     'ChangeMask',
     'Lighten',
-    'Lighten_Intensity',
     'Darken',
     'Difference',
     'Multiply',
+    'Darken',
+    'PegtopLight',
+    'Saturate',
+    'VividLight',
+    'HardLight',
+    'ColorBurn',
+    'Luminize',
+    'PinLight',
+    'SoftLight',
+    'Difference',
 ];
 
+if (require.main === module) {
+  exports.Init({
+    convert_path: 'bin/convert',
+    identify_path: 'bin/identify',
+  }, function(err, stdout) {
+    if (err) return console.error('ImageMagick Error', err, stdout);
+    console.log('COLORS', COLORS);
+    console.log('NOISE_TYPES', NOISE_TYPES);
+    console.log('COLOR_SPACES', COLOR_SPACES);
+    console.log('STATISTICS', STATISTICS);
+  });
+}

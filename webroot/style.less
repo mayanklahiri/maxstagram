@@ -1,5 +1,5 @@
 @import url(http://fonts.googleapis.com/css?family=Passion+One);
-@import url(http://fonts.googleapis.com/css?family=Raleway:300);
+@import url(http://fonts.googleapis.com/css?family=Raleway:500);
 
 body {
   background-color: #222;
@@ -46,12 +46,11 @@ h2 {
 form {
   input[type='text'], input[type='file'] {
     margin: 10px 0 10px 0;
-    padding: 10px 5px 10px 5px;
+    padding: 5px 5px 5px 5px;
     border-radius: 3px;
     min-width: 400px;
     font-weight: bold;
     font-family: 'Raleway', sans-serif;
-    letter-spacing: 2px;
   }
 
   input[type='submit'] {
@@ -75,4 +74,20 @@ form {
   color: #888;
   line-height: 150%;
   margin: 0 0 10px 0;
+}
+
+.block {
+  display: inline-block;
+  vertical-align: top;
+  float: left;
+  margin: 0 10px 10px 0;
+}
+
+.clearfix:after {
+  visibility: hidden;
+  display: block;
+  font-size: 0;
+  content: " ";
+  clear: both;
+  height: 0;
 }

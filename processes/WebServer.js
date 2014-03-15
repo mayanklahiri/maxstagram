@@ -17,9 +17,63 @@ function main() {
   // Compress HTTP responses
   app.use(express.compress())
 
+  // Add data API
+  if (config.data_api)
+    app.use(DataAPI);
+
   // Add file upload handling
   config.dir_uploads = config.dir_uploads || os.tmpdir();
-  app.use(function(req, res, next) {
+  app.use(HandleFileUpload);
+
+  // Add log-tailing URL
+  if (config.logs_url)
+    app.use(ServeLogTail);
+
+  // Add click recording for images
+  app.use(RecordImageClicks);
+
+  // Add static file serving from webroot
+  if (config.dir_webroot)
+    app.use(express.static(config.dir_webroot, {maxAge: 86400 * 1000}));
+
+  // Add custom 404 at end of chain
+  app.use(function (req, res, next) {
+    End(res, 404, 'message.jade', {message: '404: Could not get URL'});
+  });
+
+  // Start listening on webserver port
+  config.port = config.port || 8080;
+  app.listen(config.port);
+  log.info('WebServer: listening on port %d', config.port);
+
+  // Helper functions below
+
+  function End(res, http_code, template, locals) {
+    var content = util.template(template, locals);
+    res.writeHead(http_code, {'Content-Type': 'text/html'});
+    res.end(content);
+  }
+
+  function JSONEnd(res, http_code, obj) {
+    res.writeHead(http_code, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify(obj, null, 2));
+  }
+
+  function DeleteUpload(files) {
+    if (!files) return;
+    for (var key in files)
+      try {
+        var upload_path = files[key].path;
+        fs.unlinkSync(upload_path);
+        util.log.info('WebServer: deleted upload', {
+          path: upload_path,
+          type: files[key].type,
+          size: files[key].size,
+        });
+      } catch(e) {}
+  }
+
+  function HandleFileUpload(req, res, next) {
     if (req.url != '/upload' || req.method.toLowerCase() != 'post')
       return next();
     var form = new formidable.IncomingForm();
@@ -64,7 +118,8 @@ function main() {
 
       // Add to UploadIngester processing queue
       var upload_obj = util.extract(files.image, ['size', 'path', 'hash', 'name', 'type']);
-      upload_obj.email = fields.email;
+      upload_obj.name = (fields.name || upload_obj.name || '').replace(/[^a-zA-Z0-9 \',\.]/gi, '');
+      upload_obj.email = (fields.email || '').replace(/[\n\r]/gi, '');
       upload_obj.remote_ip = req.connection.remoteAddress;
       upload_obj.received = new Date().getTime();
       db.Queue.QueueForProcessing('uploads', upload_obj, function(err) {
@@ -78,54 +133,51 @@ function main() {
         return End(res, 200, 'message.jade', {message: 'Your image has been queued for processing.'});
       });  // end db.Queue.QueueForProcessing
     });  // end form.parse
-  }); // end app.use
+  }  // end HandleFileUpload
 
-  // Add log-tailing URL
-  if (config.logs_url) {
-    log.info('WebServer: serving logs at %s', config.logs_url);
-    app.use(function(req, res, next) {
-      if (req.url != config.logs_url || req.method.toLowerCase() != 'get')
-        return next();
-      util.log_tail(function (err, log_tail) {
-        if (err) return End(res, 500, 'Internal Error');
-        End(res, 200, 'logs.jade', {logs: log_tail.reverse()});
-      });
+  function ServeLogTail(req, res, next)  {
+    if (req.url != config.logs_url || req.method.toLowerCase() != 'get') return next();
+    util.log_tail(function (err, log_tail) {
+      if (err) return End(res, 500, 'Internal Error');
+      End(res, 200, 'logs.jade', {logs: log_tail.reverse()});
     });
   }
 
-  // Add static file serving from webroot
-  if (config.dir_webroot) {
-    app.use(express.static(config.dir_webroot, {maxAge: 86400 * 1000}));
+  function DataAPI(req, res, next) {
+    if (req.url.substr(0, 6) != '/data/' || req.method.toLowerCase() != 'get') return next();
+    var parts = req.url.split('/');
+    if (parts[2] === 'image' && parts.length == 5) {
+      var base_hash = parts[3];
+      var gen_id = parts[4];
+      db.Query('derived',
+               {base_hash: base_hash, gen_id: gen_id},
+               [],
+               1,
+               function (err, doc) {
+        if (doc && doc.length) {
+          var response = util.extract(doc[0], ['name', 'fx_params', 'blend_params', 'walltime_sec']);
+          response.generated = new Date(doc[0].generated);
+          return JSONEnd(res, 200, response);
+        }
+        next();
+      });
+      return;
+    }
+    return next();
   }
 
-  // Add custom 404
-  app.use(function (req, res, next) {
-    End(res, 404, 'message.jade', {message: '404: Could not get URL'});
-  });
-
-  // Start listening on webserver port
-  config.port = config.port || 8080;
-  app.listen(config.port);
-  log.info('WebServer: listening on port %d', config.port);
-
-  function End(res, http_code, template, locals) {
-    var content = util.template(template, locals);
-    res.writeHead(http_code, {'Content-Type': 'text/html'});
-    res.end(content);
-  }
-
-  function DeleteUpload(files) {
-    if (!files) return;
-    for (var key in files)
-      try {
-        var upload_path = files[key].path;
-        fs.unlinkSync(upload_path);
-        util.log.info('WebServer: deleted upload', {
-          path: upload_path,
-          type: files[key].type,
-          size: files[key].size,
-        });
-      } catch(e) {}
+  function RecordImageClicks(req, res, next) {
+    if (req.url.match(/\/derived\/[0-9a-z]+\-[0-9a-z]+\-medium.jpg/)) {
+      var url = req.url.replace(/\/derived\//, '').replace(/\-medium.jpg/, '');
+      var parts = url.split('-');
+      db.Insert('clicks', {
+        base_hash: parts[0],
+        gen_id: parts[1],
+        timestamp: new Date(),
+        ip: req.connection.remoteAddress,
+      }, function() {});
+    }
+    next();
   }
 }
 

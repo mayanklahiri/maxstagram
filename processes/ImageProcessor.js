@@ -1,4 +1,13 @@
 // The Maxstagram image processing engine.
+//
+//     1. Pulls an item from the 'base' queue marked with `_reprocess_after`
+//     2. Generates a randomly filtered image and its thumbnails.
+//     3. Pushes an indexing record to the 'derived' table.
+//     4. Pushes a notification request to the 'notifications' queue.
+//     5. If `_num_to_generate` on the item is 0, mark item as done by deleting `_reprocess_after`.
+//        Otherwise, set `_reprocess_after` to current time to release the lock.
+//
+
 var util = require('../util')
   , image = require('../image')
   , db = require('../db')
@@ -9,99 +18,117 @@ var util = require('../util')
   , config = JSON.parse(process.env.config)
   ;
 
-var TIMEOUT = 1000 * 60; // 60 seconds
+var TIMEOUT = 1000 * 120; // 120 seconds
 
 function main() {
   db.Queue.ProcessQueueItem('base', ProcessImage, TIMEOUT);
 }
 
 function ProcessImage(base_obj, cb) {
-  var metadata = util.extract(base_obj,
-      ['hash', 'name', 'size', 'path', 'remote_ip', 'email', 'received', 'num_to_derive']);
-  util.log.info('ImageProcessor: pulled queue item', metadata);
+  // The object that will be pushed to the 'derived' table for indexing.
+  var derived = {
+    base_hash:  base_obj.hash,
+    gen_id:     Math.floor(Math.random()*10e9).toString(16),
+    name:       base_obj.name,
+    remote_ip:  base_obj.remote_ip,
+    email:      base_obj.email,
+    received:   base_obj.received,
+    started:    new Date(),
+    generated:  null,
+  };
+  util.log.info('ImageProcessor: pulled queue item', util.logsafe(base_obj));
 
   // Figure out filenames for processing
   var in_file = null;
   for (var i = 0; i < base_obj.output_files.length; i++)
     if (base_obj.output_files[i].match(/-largest.jpg/)) {
-      in_file = base_obj.output_files[i];
+      derived.in_file = base_obj.output_files[i];
       break;
     }
-  if (!in_file) return cb('Item did not have a -largest.jpg output file');
-  var tmp_file_base = util.format('%s-%d',
-                                  path.join(os.tmpdir(), base_obj.hash),
-                                  process.pid);
+  if (!derived.in_file)
+    return cb('Base item did not have a -largest.jpg output file', base_obj);
+  var out_file_base = path.join(config.dir_derived, base_obj.hash) + '-' + derived.gen_id;
+  var tmp_file_base = path.join(os.tmpdir(), base_obj.hash) + process.pid;
   var fx_file = tmp_file_base + '-fx.jpg';
-  var out_file_base = util.format('%s-%s',
-                                  path.join(config.dir_derived, base_obj.hash),
-                                  Math.floor(Math.random()*10e9).toString(16));
   var out_file = out_file_base + '.jpg';
-  var derived = {};
-  var started = new Date();
 
-  // Assemble execution sequence: generate effects layer
+  // Series execution: generate a random sequence of effects -> fx_file
   var exec_seq = [];
   exec_seq.push(function(next) {
     var num_ops = util.randint(config.img_max_fx_ops-config.img_min_fx_ops) +
                   config.img_min_fx_ops;
     derived.fx_params = image.GenerateEffectsLayer(num_ops);
-    image.Process(in_file, fx_file, derived.fx_params, next);
+    image.Process(derived.in_file, fx_file, derived.fx_params, next);
   });
 
-  // Assemble execution sequence: blend effects layer
+  // Series execution: blend effects layer into original image -> out_file
   exec_seq.push(function(next) {
-    derived.blend_params = image.GenerateBlendLayer(fx_file);
-    image.Process(in_file, out_file, derived.blend_params, next);
+    derived.blend_params = image.GenerateBlendLayer();
+    var b = derived.blend_params.slice();
+    b.splice(0, 0, fx_file);
+    image.Process(derived.in_file, out_file, b, next);
   });
 
-  // Execution sequence: generate resized versions
+  // Series execution: generate resized versions -> out_file-largest.jpg, out_file-large.jpg, etc.
   exec_seq.push(function(next) {
-    image.MultiResize(out_file, out_file_base, config.img_dims, '85', next);
+    image.MultiResize(out_file, out_file_base, config.img_dims, '85', function (err, output_files) {
+      if (err || !output_files || !output_files.length) return next('MultiResize had an error', err);
+      derived.output_files = output_files;
+      next();
+    });
   });
 
-  // Execution sequence: generate entry in 'derived' table
+  // Series execution: generate entry in 'derived' table
   exec_seq.push(function(next) {
-  	derived.base_hash = base_obj.hash;
-  	derived.output = out_file;
   	derived.generated = new Date().getTime();
-    derived.walltime_sec = (new Date() - started) / 1000;
+    derived.walltime_sec = (derived.generated - derived.started) / 1000;
   	db.Insert('derived', derived, next);
   });
 
-  // Execution sequence: update num_to_derive count
+  // Series execution: update num_to_derive count on queue item
   exec_seq.push(function(next) {
     var query = {_id: base_obj._id};
-    if (base_obj.num_to_derive <= 0) {
-      // No more derivations for this round.
-      delete metadata._id;
-      util.log.info('ImageProcessor: marking as processed', metadata);
-      return db.Queue.MarkAsProcessed('base', query, function (err) {
-        if (err) return next(err);
-        // Queue notification to sender
+    if (base_obj.num_to_derive > 1) {
+      // Still more images to derive for this item
+      db.Update('base',  // table
+                query,   // base_obj identifier
+                {        // update operation
+                  '$inc': {num_to_derive: -1},  // decrease num_to_derive
+                  '$set': {_reprocess_after: new Date().getTime()}  // release queue lock
+                },
+                next);
+      return;
+    }
+
+    // No more derivations left for this image. Mark it as done in
+    // the queue so that it won't be pulled again by any process.
+    async.series([
+      function (link) {
+        util.log.info('ImageProcessor: marking as processed', util.logsafe(query));
+        db.Queue.MarkAsProcessed('base', query, link);
+      },
+      function (link) {
         var notification = {
           email: base_obj.email,
           base_hash: base_obj.hash,
+          name: base_obj.name,
+          received: base_obj.received,
           type: 'new_images_available',
         };
-        delete metadata._id;
-        util.log.info('ImageProcessor: queueing notification', metadata);
-        db.Queue.QueueForProcessing('notifications', notification, next);
-      });
-    }
-
-    delete metadata._id;
-    util.log.info('ImageProcessor: decreasing num_to_derive', metadata);
-    db.Update('base', query, {'$inc': {num_to_derive: -1}, '$set': {_reprocess_after: new Date().getTime()}}, next);
+        util.log.info('ImageProcessor: queueing notification', util.logsafe(notification));
+        db.Queue.QueueForProcessing('notifications', notification, link);
+      }
+    ], next);
   });
 
-  // Execution sequence: print a logline
-  exec_seq.push(function(next) {
-    delete derived._id;
-  	util.log.info('ImageProcessor: finished image', derived);
-  	next();
-  })
-
-  async.series(exec_seq, cb);
+  // Series terminator: clean up and print a logline
+  async.series(exec_seq, function (err, detail) {
+    try {
+      fs.unlinkSync(fx_file);
+    } catch(e) {}
+    if (!err) util.log.info('ImageProcessor: finished image', util.logsafe(derived));
+    cb(err, detail);
+  });
 }
 
 if (require.main === module) util.init(config, main);

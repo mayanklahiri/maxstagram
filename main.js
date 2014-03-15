@@ -14,7 +14,7 @@ function main() {
   // In a test configuration, override parameters with their _test versions.
   for (var key in config)
     if (key.match(/_test$/)) {
-      if (config.test)
+      if (config.test !== 'false')
         config[key.substr(0, key.length-5)] = config[key];
       delete config[key];
     }

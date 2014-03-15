@@ -20,7 +20,7 @@ function IngestUpload(upload_obj, cb) {
   var out_file_base = path.join(config.dir_base, metadata.hash);
   util.log.info(util.format('IngestUpload: pulled queue item of size %dkb',
                             Math.floor(metadata.size/1024)),
-                metadata);
+                util.logsafe(metadata));
 
   // Assemble execution sequence: resize image into configured sizes
   var exec_seq = [];
@@ -43,7 +43,7 @@ function IngestUpload(upload_obj, cb) {
     delete metadata._id;
     util.log.info(util.format('IngestUpload: ingested upload of size %dkb',
                               Math.floor(metadata.size/1024)),
-                  metadata);
+                  util.logsafe(metadata));
     db.Queue.MarkAsProcessed('uploads', id, next);
   });
 

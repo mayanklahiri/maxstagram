@@ -22,14 +22,15 @@ exports.indices = {
   },
 
   // Derived is linked to base via base.hash = derived.base_hash
-  derived_by_base_hash: {
+  derived_by_base_hash_and_gen_id: {
     collection: 'derived',
     definition: {
       'base_hash': 1,
+      'gen_id': 1,
     },
     options: {
       background: true,
-      unique: false,
+      unique: true,
     },
   },
 

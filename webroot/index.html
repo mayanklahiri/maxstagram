@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
   	<link rel="stylesheet/less" type="text/css" href="style.less" />
-	<script src="less-1.7.0.min.js"></script>
+	  <script src="less-1.7.0.min.js"></script>
+    <script src="ga.js"></script>
   </head>
   <body>
   <div class="container">
@@ -14,12 +15,19 @@
           enctype="multipart/form-data"
           action="/upload">
 
-      <div class="label">
-        <label for="image">Choose a photo</label>
-        <br>
-        <input id="image"
-               name="image"
-               type="file">
+      <div class="label clearfix">
+        <div class="block">
+          <label for="image">Choose a photo</label>
+          <br>
+          <input id="image"
+                 name="image"
+                 type="file">
+        </div>
+        <div class="block">
+          <label for="name">Give it a name</label>
+          <br>
+          <input type='text' id="name" name="name">
+        </div>
       </div>
 
       <div class="label">
@@ -29,14 +37,10 @@
       </div>
 
       <p class="fine">
-         Filtered images are generated in batches of 50 and
-         the links to download them are emailed to you. <br>
+         Filtered images are generated in large batches and
+         the links to download them are emailed to you.
          Most of the results will be awful, but
-         you do find the occassional gem that might make a nice
-         wall decoration. <br>
-         If you like any of the results, you can download high-quality
-         versions for free. <br>
-         Happy hunting!
+         you do find the occassional gem.
       </p>
 
       <input type="submit" value="UPLOAD FOR PROCESSING">

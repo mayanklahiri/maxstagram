@@ -1,4 +1,5 @@
 var fs = require('fs')
+  , async = require('async')
   , path = require('path')
   , db = require('../db')
   , util = require('../util')
@@ -14,59 +15,79 @@ function main() {
 
 function SendNotification(notification_obj, cb) {
   var log = util.log;
-  var domain = config.domain;
-  if (domain[domain.length-1] !== '/')
-    domain += '/';
-
-  log.info('SendNotification: sending to ' + notification_obj.email,
+  log.info('SendNotification: pulled notification to ' + notification_obj.email,
            util.extract(notification_obj, ['email', 'base_hash', 'type']));
+  var query = {base_hash: notification_obj.base_hash};
+  var domain = config.domain;
+  if (domain[domain.length-1] == '/')
+    domain = domain.substr(0, domain.length-1);
 
   // Assuming type == 'new_images_available'
-  var query = {base_hash: notification_obj.base_hash};
-  db.Query('derived', query, [['generated', -1]], config.img_derivations_per_round, function (err, docs) {
-    if (err || !docs || !docs.length) return cb(err, docs);
-    // Change paths to relative
+  async.waterfall([
+    _QueryLatestDerivedImages,
+    _GenerateNotificationBody,
+    _SendEmail,
+    _MarkAsProcessed,
+  ], cb);
+
+  function _QueryLatestDerivedImages(next) {
+    db.Query(
+        'derived',                          // table
+        query,                              // base_hash
+        [['generated', -1]],                // most recently generated first
+        config.img_derivations_per_round,   // limit
+        next);
+  }
+
+  function _GenerateNotificationBody(docs, next) {
+    if (!docs) docs = [];
+    if (!docs.length)
+      return next('Unable to retrieve any derived images.', notification_obj);
     for (var i = 0; i < docs.length; i++) {
-      var img_path = docs[i].output;
-      docs[i].path = domain +
-                     'derived/' +
-                     path.basename(img_path, '.jpg') +
-                     '-square.jpg';
+      var base_hash = docs[i].base_hash;
+      var gen_id = docs[i].gen_id;
+      docs[i].thumbnail = domain +
+                          '/derived/' +
+                          base_hash + '-' + gen_id +
+                          '-square.jpg';
       docs[i].link = domain +
-                     'derived/' +
-                     path.basename(img_path, '.jpg') +
+                     '/see.html?img=' + base_hash + '-' + gen_id +
                      '-largest.jpg';
     }
-
-    // Render message template
     var html = util.template('notification.jade', {
       docs: docs,
       notification: notification_obj,
     });
+    next(null, html, docs);
+  }
 
-    // Send email
+  function _SendEmail(html, docs, next) {
+    if (config.send_email !== true) {
+      log.info('SendNotification send_email is FALSE, not sending email.', {
+        docs: docs.map(function(obj) {return util.extract(obj, ['thumbnail', 'link'])}, docs),
+      });
+      return next();
+    }
+    if (!config.email_from) return next();
+    log.info('SendNotification: sending to ' + notification_obj.email);
     var mailgun_key = fs.readFileSync(config.mailgun_key_file, 'utf8').replace(/\s*$/, '');
     var mg = new Mailgun(mailgun_key);
     var body = ['To: ' + notification_obj.email,
-                'Subject: New images available',
+                'Subject: New images available for "' + notification_obj.name + '"',
                 'Content-Type: text/html;',
                 '',
                 html,
                ].join('\n');
-    mg.sendRaw('"Maxstagram Notification" <noreply@'+domain+'>',
+    mg.sendRaw(config.email_from,
                [notification_obj.email],
                body,
-               function (err) {
-                 if (!err) {
-                   log.info(util.format('SendNotification: sent to %s', notification_obj.email));
-                   db.Queue.MarkAsProcessed('notifications', notification_obj, cb);
-                 } else {
-                   log.error(util.format('SendNotification: error sending to %s', notification_obj.email),
-                             {err: err});
-                   cb(err);
-                 }
-               });
-  });
+               next);
+  }
+
+  function _MarkAsProcessed(next) {
+    log.info('SendNotification: marking as done', util.logsafe(query));
+    db.Queue.MarkAsProcessed('notifications', query, next);
+  }
 }
 
 if (require.main === module) util.init(config, main);

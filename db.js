@@ -23,7 +23,6 @@ exports.Query = function (table, query, sort, limit, cb) {
     };
     db.collection(table).find(query, options).toArray(cb);
   });
-
 }
 
 exports.Insert = function (table, object, cb) {
@@ -105,7 +104,7 @@ exports.Queue = {
           delete q_item._id;
           util.log.info(util.format('ProcessQueueItem:%s: item finished, %dms',
                                     table, time_delta),
-                        q_item);
+                        util.logsafe(q_item));
           process.exit(0);
         }
       });

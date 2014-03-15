@@ -28,6 +28,7 @@ util.clone = function(obj) {
 }
 
 // Set up logging and override util.log
+// Check ImageMagick compliance
 util.init = function(config, cb) {
   log.remove(log.transports.Console);
 
@@ -45,7 +46,7 @@ util.init = function(config, cb) {
   G.config = config;
   util.log = log;
 
-  cb && cb();
+  require('./image').Init(config, cb);
 }
 
 util.init_db = function(cb) {
@@ -103,6 +104,14 @@ util.log_tail = function(cb) {
       limit: 100,
     }).toArray(cb);
   }
+}
+
+// Deals with quirks in the Winston MongoDB transport when logging metadata
+util.logsafe = function(obj) {
+  var n = util.clone(obj);
+  n.__id = n._id;
+  delete n._id;
+  return n;
 }
 
 // Overrides dest's keys with src's keys
@@ -170,6 +179,8 @@ util.choice = function(array) {
 
 util.extend = function(base, extension) {
   if (!base || !extension) return;
+  if (typeof base != 'object') throw new ValueError('base should be an array.');
+  if (typeof extension != 'object') throw new ValueError('extension should be an array.');
   for (var i = 0; i < extension.length; i++)
     base.push(extension[i]);
 }

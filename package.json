@@ -8,6 +8,11 @@
     "photo filters",
     "random art"
   ],
+  "scripts": {
+    "clean": "rm -f webroot/base/* webroot/derived/* uploads/* && echo \"db.dropDatabase()\" | mongo maxstagram_test",
+    "dev": "node main.js",
+    "prod": "node main.js --test=false"
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/mayanklahiri/maxstagram.git"
