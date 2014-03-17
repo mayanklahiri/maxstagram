@@ -1,10 +1,13 @@
 // Reusable image processing routines, based on ImageMagick
-var im = require('imagemagick')
+var init = require('./init')
+  , im = require('imagemagick')
   , async = require('async')
   , util = require('./util')
   ;
 
 exports.Process = function(in_file, out_file, fx_params, cb) {
+  var log = init.log;
+
   fx_params = fx_params.slice();
   fx_params.splice(0, 0, in_file);
   fx_params.push('-limit');
@@ -14,7 +17,7 @@ exports.Process = function(in_file, out_file, fx_params, cb) {
   var start_time = new Date();
   im.convert(fx_params, function (err, stdout) {
     if (err)
-      util.log.error('ImageMagick convert: error', {
+      log.error('ImageMagick convert: error', {
         in_file: in_file,
         out_file: out_file,
         params: fx_params,
@@ -23,7 +26,7 @@ exports.Process = function(in_file, out_file, fx_params, cb) {
         walltime_sec: (new Date() - start_time) / 1000,
       });
     else
-      util.log.info('ImageMagick convert: finished', {
+      log.info('ImageMagick convert: finished', {
         in_file: in_file,
         out_file: out_file,
         params: fx_params,
@@ -39,6 +42,7 @@ exports.MultiResize = function(in_file, out_file_base, sizes, quality, cb) {
   if (!out_file_base) throw new Error('MultiResize: out_file_base is null');
   if (!sizes) throw new Error('MultiResize: sizes is null');
   if (!cb) throw new Error('MultiResize: cb is null');
+  var log = init.log;
 
   // Assemble asynchronous series circuit
   var exec_sequence = [];
@@ -77,8 +81,7 @@ exports.MultiResize = function(in_file, out_file_base, sizes, quality, cb) {
   // Terminal node in the series circuit
   function _terminal(err, stdout) {
     if (err) {
-      util.log.error('MultiResize:Imagemagick: error ' + err,
-                     {err: err, stdout: stdout});
+      log.error('MultiResize:Imagemagick: error ' + err, util.logsafe({err: err, stdout: stdout}));
       return cb(err, stdout);
     }
     return cb(null, output_files);
@@ -145,6 +148,8 @@ exports.GenerateBlendLayer = function() {
 
 // config has optional fields convert_path, identify_path
 exports.Init = function(config, cb) {
+  var log = init.log;
+
   if (config.convert_path)
     im.convert.path = config.convert_path;
   if (config.identify_path)

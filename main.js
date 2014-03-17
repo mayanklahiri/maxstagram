@@ -1,9 +1,7 @@
-// Maxstagram
-// ==========
-//
-// A flexible, continuous image processing web service.
+// Maxstagram: A flexible, continuous image processing web service.
 //
 var argv = require('minimist')(process.argv.slice(2))
+  , init = require('./init')
   , util = require('./util')
   ;
 
@@ -12,6 +10,7 @@ function main() {
   var config = util.mergeInto(require('./config'), argv);
 
   // In a test configuration, override parameters with their _test versions.
+  // Otherwise, delete the _test versions.
   for (var key in config)
     if (key.match(/_test$/)) {
       if (config.test !== 'false')
@@ -19,18 +18,20 @@ function main() {
       delete config[key];
     }
 
-  // Initialize this process
-  util.init(config, function (err) {
+  // Initialize logging and database access via util.init()
+  init.Init(config, function (err) {
     if (err) throw err;
 
-    // Load process modules
-    util.launch('processes/WebServer', config, {
+    // Webserver process
+    init.Launch('processes/WebServer', config, {
       exponential_backoff: true,
       log_events: true,
     });
-    util.launch('processes/UploadIngester', config);
-    util.launch('processes/ImageProcessor', config);
-    util.launch('processes/NotificationSender', config);
+
+    // Queue processors
+    init.Launch('processes/UploadIngester', config);
+    init.Launch('processes/ImageProcessor', config);
+    init.Launch('processes/NotificationSender', config);
   });
 }
 

@@ -1,6 +1,17 @@
 
 exports.indices = {
   // Queues have an indexed _reprocess_after
+  uploads_hash_is_unique: {
+    collection: 'uploads',
+    definition: {
+      'hash': 1,
+    },
+    options: {
+      unique: true,
+      dropDups: true,
+    },
+  },
+
   uploads_is_a_queue: {
     collection: 'uploads',
     definition: {
@@ -8,8 +19,20 @@ exports.indices = {
     },
     options: {
       unique: false,
-    }
+    },
   },
+
+  base_hash_is_unqiue: {
+    collection: 'base',
+    definition: {
+      'hash': 1,
+    },
+    options: {
+      unique: true,
+      dropDups: true,
+    },
+  },
+
 
   base_is_a_queue: {
     collection: 'base',
@@ -18,7 +41,7 @@ exports.indices = {
     },
     options: {
       unique: false,
-    }
+    },
   },
 
   // Derived is linked to base via base.hash = derived.base_hash

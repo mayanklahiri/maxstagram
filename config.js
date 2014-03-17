@@ -2,6 +2,9 @@ module.exports = {
   // Run in TEST mode (overridden by command line flags)
   test: true,
 
+  // Asynchronous task processor settings
+  max_task_failures: 10,
+
   // Directories used by the webserver, relative to package root.
   //
   // webroot: Contains static files that are served
@@ -19,9 +22,8 @@ module.exports = {
   max_upload_size: 1024 * 1024 * 14,   // 14 MB
   data_api: true,
 
-  // Serve the log stream at a particular URL, or null to disable serving
-  // the logs over HTTP.
-  logs_url: '/logz',
+  // Special purpose URLs to serve
+  logs_url: '/logz',      // Log tailer
 
   // Mailgun e-mail delivery settings, using an account at http://mailgun.com.
   //
@@ -67,7 +69,7 @@ module.exports = {
 
   // Number of images to derive for each image processing round.
   img_derivations_per_round: 40,
-  img_derivations_per_round_test: 5,
+  img_derivations_per_round_test: 3,
 
   // Minimum and maximum number of effects operations that
   // will be blended together to generate the final image.

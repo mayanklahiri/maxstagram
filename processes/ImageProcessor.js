@@ -8,14 +8,14 @@
 //        Otherwise, set `_reprocess_after` to current time to release the lock.
 //
 
-var util = require('../util')
+var init = require('../init')
+  , util = require('../util')
   , image = require('../image')
   , db = require('../db')
   , os = require('os')
   , fs = require('fs')
   , path = require('path')
   , async = require('async')
-  , config = JSON.parse(process.env.config)
   ;
 
 var TIMEOUT = 1000 * 120; // 120 seconds
@@ -25,18 +25,21 @@ function main() {
 }
 
 function ProcessImage(base_obj, cb) {
+  var log = init.log;
+  var config = init.config;
+
   // The object that will be pushed to the 'derived' table for indexing.
   var derived = {
     base_hash:  base_obj.hash,
-    gen_id:     Math.floor(Math.random()*10e9).toString(16),
+    gen_id:     util.randHex(12),
     name:       base_obj.name,
     remote_ip:  base_obj.remote_ip,
     email:      base_obj.email,
     received:   base_obj.received,
-    started:    new Date(),
-    generated:  null,
+    started:    new Date(),         // time this round started
+    generated:  null,               // time this round finished
   };
-  util.log.info('ImageProcessor: pulled queue item', util.logsafe(base_obj));
+  log.info('ImageProcessor: pulled queue item', util.logsafe(base_obj));
 
   // Figure out filenames for processing
   var in_file = null;
@@ -46,7 +49,7 @@ function ProcessImage(base_obj, cb) {
       break;
     }
   if (!derived.in_file)
-    return cb('Base item did not have a -largest.jpg output file', base_obj);
+    return cb('Base item did not have a "-largest.jpg" suffix output file', base_obj);
   var out_file_base = path.join(config.dir_derived, base_obj.hash) + '-' + derived.gen_id;
   var tmp_file_base = path.join(os.tmpdir(), base_obj.hash) + process.pid;
   var fx_file = tmp_file_base + '-fx.jpg';
@@ -71,7 +74,7 @@ function ProcessImage(base_obj, cb) {
 
   // Series execution: generate resized versions -> out_file-largest.jpg, out_file-large.jpg, etc.
   exec_seq.push(function(next) {
-    image.MultiResize(out_file, out_file_base, config.img_dims, '85', function (err, output_files) {
+    image.MultiResize(out_file, out_file_base, config.img_dims, '80', function (err, output_files) {
       if (err || !output_files || !output_files.length) return next('MultiResize had an error', err);
       derived.output_files = output_files;
       next();
@@ -104,7 +107,7 @@ function ProcessImage(base_obj, cb) {
     // the queue so that it won't be pulled again by any process.
     async.series([
       function (link) {
-        util.log.info('ImageProcessor: marking as processed', util.logsafe(query));
+        log.info('ImageProcessor: marking as processed', util.logsafe(query));
         db.Queue.MarkAsProcessed('base', query, link);
       },
       function (link) {
@@ -115,7 +118,7 @@ function ProcessImage(base_obj, cb) {
           received: base_obj.received,
           type: 'new_images_available',
         };
-        util.log.info('ImageProcessor: queueing notification', util.logsafe(notification));
+        log.info('ImageProcessor: queueing notification', util.logsafe(notification));
         db.Queue.QueueForProcessing('notifications', notification, link);
       }
     ], next);
@@ -126,9 +129,9 @@ function ProcessImage(base_obj, cb) {
     try {
       fs.unlinkSync(fx_file);
     } catch(e) {}
-    if (!err) util.log.info('ImageProcessor: finished image', util.logsafe(derived));
+    if (!err) log.info('ImageProcessor: finished image', util.logsafe(derived));
     cb(err, detail);
   });
 }
 
-if (require.main === module) util.init(config, main);
+if (require.main === module) init.Init(null, main);

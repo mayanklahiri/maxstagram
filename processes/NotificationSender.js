@@ -1,5 +1,6 @@
 var fs = require('fs')
   , async = require('async')
+  , init = require('../init')
   , path = require('path')
   , db = require('../db')
   , util = require('../util')
@@ -14,9 +15,9 @@ function main() {
 }
 
 function SendNotification(notification_obj, cb) {
-  var log = util.log;
+  var log = init.log;
   log.info('SendNotification: pulled notification to ' + notification_obj.email,
-           util.extract(notification_obj, ['email', 'base_hash', 'type']));
+           util.logsafe(notification_obj));
   var query = {base_hash: notification_obj.base_hash};
   var domain = config.domain;
   if (domain[domain.length-1] == '/')
@@ -81,13 +82,19 @@ function SendNotification(notification_obj, cb) {
     mg.sendRaw(config.email_from,
                [notification_obj.email],
                body,
-               next);
+               function (err, detail) {
+      if (err) log.error(__where+'Mailgun error', {err: err, detail: detail});
+      util.checkErrorAndReturn(err, __where, 'Mailgun.sendRaw failed', next);
+    });
   }
 
   function _MarkAsProcessed(next) {
     log.info('SendNotification: marking as done', util.logsafe(query));
-    db.Queue.MarkAsProcessed('notifications', query, next);
+    db.Queue.MarkAsProcessed('notifications', query, function (err, new_doc) {
+      log.info('MarkAsProcessed on notifications returned', new_doc);
+      next(err, new_doc);
+    });
   }
 }
 
-if (require.main === module) util.init(config, main);
+if (require.main === module) init.Init(null, main);

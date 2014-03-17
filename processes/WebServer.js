@@ -1,15 +1,17 @@
 // Webserver process
-var util = require('../util')
+var init = require('../init')
+  , util = require('../util')
   , os = require('os')
   , fs = require('fs')
   , db = require('../db')
   , express = require('express')
   , formidable = require('formidable')
-  , config = JSON.parse(process.env.config)
   ;
 
-function main() {
-  log = util.log;
+function main(err) {
+  if (err) throw err;
+  var log = init.log;
+  var config = init.config;
 
   // Create express app
   var app = express();
@@ -65,7 +67,7 @@ function main() {
       try {
         var upload_path = files[key].path;
         fs.unlinkSync(upload_path);
-        util.log.info('WebServer: deleted upload', {
+        log.info('WebServer: deleted upload', {
           path: upload_path,
           type: files[key].type,
           size: files[key].size,
@@ -116,28 +118,34 @@ function main() {
         });
       }
 
-      // Add to UploadIngester processing queue
-      var upload_obj = util.extract(files.image, ['size', 'path', 'hash', 'name', 'type']);
-      upload_obj.name = (fields.name || upload_obj.name || '').replace(/[^a-zA-Z0-9 \',\.]/gi, '');
-      upload_obj.email = (fields.email || '').replace(/[\n\r]/gi, '');
-      upload_obj.remote_ip = req.connection.remoteAddress;
-      upload_obj.received = new Date().getTime();
-      db.Queue.QueueForProcessing('uploads', upload_obj, function(err) {
+      // Create the queue item to push onto the UploadIngester processing queue
+      var file_metadata_obj = util.extract(files.image, ['size', 'path', 'hash', 'name', 'type']);
+      var queue_item_obj = util.mergeInto(file_metadata_obj, {
+        name:      (fields.name || file_metadata_obj.name || '').replace(/[^a-zA-Z0-9 \',\.]/gi, ''),
+        email:     (fields.email || '').replace(/\s+/gi, ''),
+        remote_ip: req.connection.remoteAddress,
+        received:  new Date().getTime(),
+        hash:      util.randHex(16),  // treat each upload uniquely
+      });
+
+      db.Queue.QueueForProcessing('uploads', queue_item_obj, function(err, new_doc) {
         if (err) {
-          log.error('WebServer: could not queue file upload', {doc: upload_obj, err: err});
-          return End(res, 500, 'message.jade', {message: 'Error processing upload.'});
+          log.error('WebServer: could not queue file upload', {doc: queue_item_obj, err: err});
+          End(res, 500, 'message.jade', {message: 'Error processing upload.'});
+        } else {
+          log.info(util.format('WebServer: queued %s upload of size %dkb',
+                               queue_item_obj.type,
+                               Math.floor(queue_item_obj.size/1024)),
+                   util.logsafe(new_doc));
+          End(res, 200, 'message.jade', {message: 'Your image has been queued for processing.'});
         }
-        log.info(util.format('WebServer: queued %s upload of size %dkb',
-                             upload_obj.type, Math.floor(upload_obj.size/1024)),
-                 upload_obj);
-        return End(res, 200, 'message.jade', {message: 'Your image has been queued for processing.'});
       });  // end db.Queue.QueueForProcessing
     });  // end form.parse
   }  // end HandleFileUpload
 
   function ServeLogTail(req, res, next)  {
     if (req.url != config.logs_url || req.method.toLowerCase() != 'get') return next();
-    util.log_tail(function (err, log_tail) {
+    db.log_tail(function (err, log_tail) {
       if (err) return End(res, 500, 'Internal Error');
       End(res, 200, 'logs.jade', {logs: log_tail.reverse()});
     });
@@ -146,6 +154,25 @@ function main() {
   function DataAPI(req, res, next) {
     if (req.url.substr(0, 6) != '/data/' || req.method.toLowerCase() != 'get') return next();
     var parts = req.url.split('/');
+
+    // GET /data/stream
+    if (parts[2] === 'stream') {
+      db.Query('derived',           // table
+               {},                  // query
+               [['_created', -1]],  // sort
+               50,                  // limit
+               function (err, docs) {
+        if (docs && docs.length) {
+          docs = docs.map(function(doc) { return util.extract(doc, ['name', 'base_hash', 'gen_id']) });
+          var response = {
+            docs: docs,
+          }
+          return JSONEnd(res, 200, response);
+        }
+      });
+    }
+
+    // GET /data/image/BASE_HASH/GEN_ID
     if (parts[2] === 'image' && parts.length == 5) {
       var base_hash = parts[3];
       var gen_id = parts[4];
@@ -181,4 +208,4 @@ function main() {
   }
 }
 
-if (require.main === module) util.init(config, main);
+if (require.main === module) init.Init(null, main);
